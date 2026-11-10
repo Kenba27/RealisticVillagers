@@ -206,6 +206,7 @@ jobs:
         working-directory: proj
         shell: bash
         run: |
+          set +e +o pipefail
           CP=""
           for j in $(find ~/.gradle ~/.m2 "$PWD/.gradle" -name '*.jar' 2>/dev/null); do
             if unzip -Z1 "$j" 2>/dev/null | grep -qE '^(net/minecraft/world/entity/EntityType|org/bukkit/craftbukkit/block/data/CraftBlockData)\.class$'; then
@@ -220,11 +221,11 @@ jobs:
             for j in ${CP//:/ }; do unzip -Z1 "$j" | grep -i 'EntityType' | grep '\.class$'; done | sort -u
             echo
             echo '=== Class nao chua field VILLAGER ==='
+            LIST=""
             for j in ${CP//:/ }; do
-              for c in $(unzip -Z1 "$j" | grep -E '^net/minecraft/world/entity/[A-Za-z]*\.class$' | sed 's#/#.#g; s#\.class$##'); do
-                javap -p -cp "$CP" "$c" 2>/dev/null | grep -q ' VILLAGER;' && echo "$c"
-              done
-            done | sort -u
+              LIST="$LIST $(unzip -Z1 "$j" | grep -E '^net/minecraft/world/entity/[A-Za-z]*\.class$' | sed 's#/#.#g; s#\.class$##' | tr '\n' ' ')"
+            done
+            javap -p -cp "$CP" $LIST 2>/dev/null | awk '/(class|interface|enum|record) /{c=$0} / VILLAGER;/{print c}' | sort -u
             echo
             for c in \
               net.minecraft.world.entity.EntityType \
