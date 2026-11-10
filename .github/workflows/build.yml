@@ -180,7 +180,7 @@ jobs:
             echo '```'
             grep -E "error:" gradle-build.log | sed -E 's#.*/realisticvillagers/##' | sort -u | head -400
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
           JAR=""
           for j in $(find ~/.gradle ~/.m2 "$PWD/.gradle" -name '*.jar' 2>/dev/null); do
@@ -197,7 +197,7 @@ jobs:
               echo '### Class Villager / WanderingTrader / Cat'
               unzip -l "$JAR" | grep -iE "/(Villager|WanderingTrader|Cat|AbstractVillager)\.class" || true
             fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload plugin jar
         uses: actions/upload-artifact@v4
