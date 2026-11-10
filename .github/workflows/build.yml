@@ -201,6 +201,70 @@ jobs:
             fi
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Dump API 26.2 day du (chi chay khi loi)
+        if: failure()
+        working-directory: proj
+        shell: bash
+        run: |
+          CP=""
+          for j in $(find ~/.gradle ~/.m2 "$PWD/.gradle" -name '*.jar' 2>/dev/null); do
+            if unzip -Z1 "$j" 2>/dev/null | grep -qE '^(net/minecraft/world/entity/EntityType|org/bukkit/craftbukkit/block/data/CraftBlockData)\.class$'; then
+              CP="$CP:$j"
+            fi
+          done
+          CP="${CP#:}"
+          echo "CP=$CP" > api-dump.txt
+          FIRST="${CP%%:*}"
+          {
+            echo '=== Classes co ten chua EntityType ==='
+            for j in ${CP//:/ }; do unzip -Z1 "$j" | grep -i 'EntityType' | grep '\.class$'; done | sort -u
+            echo
+            echo '=== Class nao chua field VILLAGER ==='
+            for j in ${CP//:/ }; do
+              for c in $(unzip -Z1 "$j" | grep -E '^net/minecraft/world/entity/[A-Za-z]*\.class$' | sed 's#/#.#g; s#\.class$##'); do
+                javap -p -cp "$CP" "$c" 2>/dev/null | grep -q ' VILLAGER;' && echo "$c"
+              done
+            done | sort -u
+            echo
+            for c in \
+              net.minecraft.world.entity.EntityType \
+              net.minecraft.world.entity.ai.Brain \
+              net.minecraft.world.entity.npc.villager.Villager \
+              net.minecraft.world.entity.npc.Villager \
+              net.minecraft.world.entity.npc.villager.VillagerGoalPackages \
+              net.minecraft.world.entity.ai.behavior.VillagerGoalPackages \
+              net.minecraft.world.entity.projectile.arrow.AbstractArrow \
+              net.minecraft.world.entity.projectile.AbstractArrow \
+              net.minecraft.world.entity.projectile.arrow.ThrownTrident \
+              net.minecraft.world.entity.projectile.ThrownTrident \
+              net.minecraft.world.entity.projectile.FishingHook \
+              net.minecraft.world.entity.LivingEntity \
+              net.minecraft.world.item.component.BlocksAttacks \
+              net.minecraft.world.item.component.ChargedProjectiles \
+              net.minecraft.world.item.ItemStackTemplate \
+              net.minecraft.world.effect.MobEffect \
+              net.minecraft.world.effect.MobEffectInstance \
+              net.minecraft.world.entity.ai.sensing.NearestVisibleLivingEntitySensor \
+              net.minecraft.world.entity.ai.sensing.Sensor \
+              net.minecraft.world.entity.EntitySpawnReason \
+              net.minecraft.world.entity.EntitySpawnRequest \
+              net.minecraft.world.entity.Entity \
+              org.bukkit.craftbukkit.block.data.CraftBlockData ; do
+              echo "=================== $c"
+              javap -p -cp "$CP" "$c" 2>&1 | head -400
+            done
+          } >> api-dump.txt 2>&1
+          wc -l api-dump.txt
+          head -c 20000 api-dump.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload API dump
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-dump
+          path: proj/api-dump.txt
+          if-no-files-found: warn
+
       - name: Upload plugin jar
         uses: actions/upload-artifact@v4
         with:
