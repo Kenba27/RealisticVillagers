@@ -84,6 +84,20 @@ jobs:
               }
           }
           ''')
+
+          # 4) Paper/MC 26.2: FarmBlock doi ten thanh FarmlandBlock
+          hf = pathlib.Path("proj/v26_2/src/main/java/me/matsubara/realisticvillagers/entity/v26_2/villager/ai/behaviour/work/HarvestFarmland.java")
+          t = hf.read_text()
+          t = re.sub(r"\bFarmBlock\b", "FarmlandBlock", t)
+          hf.write_text(t)
+
+          # 5) Villager.ReputationEvent khong con trong API 26.2 -> bo 3 ham override (vo hieu hoa, khong anh huong logic plugin)
+          gc = pathlib.Path("proj/v26_2/src/main/java/me/matsubara/realisticvillagers/nms/v26_2/CustomGossipContainer.java")
+          g = gc.read_text()
+          g, n = re.subn(r"    @Override\n    public void remove\([^)]*Villager\.ReputationEvent event\) \{\n[^\n]*\n    \}\n\n?", "", g)
+          assert n == 3, n
+          g = g.replace("import org.bukkit.entity.Villager;\n", "")
+          gc.write_text(g)
           PYEOF
           python3 patch.py
           grep -n -A3 "ConfigUpdater\|packetevents-spigot" proj/core/pom.xml
@@ -127,3 +141,4 @@ jobs:
         with:
           name: build-log
           path: proj/gradle-build.log
+          
