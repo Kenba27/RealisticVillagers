@@ -230,6 +230,14 @@ jobs:
             for c in \
               net.minecraft.world.entity.EntityType \
               net.minecraft.world.entity.ai.Brain \
+              net.minecraft.world.entity.ai.Brain\$Packed \
+              net.minecraft.world.entity.ai.Brain\$Provider \
+              net.minecraft.world.entity.ai.Brain\$ActivitySupplier \
+              net.minecraft.world.entity.ai.ActivityData \
+              net.minecraft.world.entity.ai.memory.MemoryMap \
+              net.minecraft.world.entity.EntityTypes \
+              net.minecraft.world.entity.npc.villager.AbstractVillager \
+              net.minecraft.tags.EntityTypeTags \
               net.minecraft.world.entity.npc.villager.Villager \
               net.minecraft.world.entity.npc.Villager \
               net.minecraft.world.entity.npc.villager.VillagerGoalPackages \
@@ -252,7 +260,7 @@ jobs:
               net.minecraft.world.entity.Entity \
               org.bukkit.craftbukkit.block.data.CraftBlockData ; do
               echo "=================== $c"
-              javap -p -cp "$CP" "$c" 2>&1 | head -400
+              javap -p -cp "$CP" "$c" 2>&1 | head -600
             done
           } >> api-dump.txt 2>&1
           wc -l api-dump.txt
