@@ -123,10 +123,81 @@ jobs:
         with:
           gradle-version: current
 
+      - name: Va loi 26.2 (quyen truy cap, am thanh meo, PetCat, hien du loi)
+        run: |
+          cat > patch2.py <<'PYEOF2'
+          import re, pathlib
+          base = pathlib.Path("proj/v26_2/src/main/java/me/matsubara/realisticvillagers")
+
+          # A) Paper 26.2: cac ham am thanh trong Villager/WanderingTrader da la public -> mo rong quyen truy cap (luon hop le)
+          for f in ["entity/v26_2/WanderingTraderNPC.java", "entity/v26_2/villager/VillagerNPC.java"]:
+              p = base / f
+              s = p.read_text()
+              s = re.sub(r"protected (@Nullable )?(SoundEvent (?:getAmbientSound|getHurtSound|getDeathSound|getTradeUpdatedSound)\()", r"public \1\2", s)
+              p.write_text(s)
+
+          # B) PetCat: Cat da co setRelaxStateOne/isRelaxStateOne public -> xoa ban private + field reflection
+          p = base / "entity/v26_2/pet/PetCat.java"
+          s = p.read_text()
+          s = re.sub(r"[^\n]*private static final EntityDataAccessor<Boolean> RELAX_STATE_ONE[^\n]*\n", "", s)
+          s, n = re.subn(r"    private void setRelaxStateOne\(boolean flag\) \{\n[^\n]*\n    \}\n\n", "", s)
+          assert n == 1, "setRelaxStateOne"
+          s, n = re.subn(r"    private boolean isRelaxStateOne\(\) \{\n[^\n]*\n    \}\n\n", "", s)
+          assert n == 1, "isRelaxStateOne"
+          # C) SoundEvents.CAT_* da bi bo (am thanh meo gio la variant) -> phat bang ten am thanh (Bukkit)
+          s = s.replace("playSound(SoundEvents.CAT_EAT, 1.0f, 1.0f);",
+            'getBukkitEntity().getWorld().playSound(getBukkitEntity().getLocation(), "entity.cat.eat", org.bukkit.SoundCategory.NEUTRAL, 1.0f, 1.0f);')
+          s = s.replace("playSound(SoundEvents.CAT_BEG_FOR_FOOD, 1.0f, 1.0f);",
+            'getBukkitEntity().getWorld().playSound(getBukkitEntity().getLocation(), "entity.cat.beg_for_food", org.bukkit.SoundCategory.NEUTRAL, 1.0f, 1.0f);')
+          p.write_text(s)
+
+          p = base / "entity/v26_2/villager/ai/behaviour/core/TameOrFeedPet.java"
+          s = p.read_text()
+          s = s.replace("tamable.playSound(SoundEvents.CAT_EAT, 1.0f, 1.0f);",
+            'tamable.getBukkitEntity().getWorld().playSound(tamable.getBukkitEntity().getLocation(), "entity.cat.eat", org.bukkit.SoundCategory.NEUTRAL, 1.0f, 1.0f);')
+          p.write_text(s)
+
+          # D) Hien thi toi da 2000 loi thay vi 100
+          g = pathlib.Path("proj/build.gradle.kts")
+          t = g.read_text()
+          t = t.replace('options.encoding = "UTF-8"', 'options.encoding = "UTF-8"\n    options.compilerArgs.add("-Xmaxerrs")\n    options.compilerArgs.add("2000")')
+          g.write_text(t)
+          PYEOF2
+          python3 patch2.py
+
       - name: Build plugin 26.2 (Gradle)
         working-directory: proj
         shell: bash
         run: gradle --no-daemon --stacktrace jar 2>&1 | tee gradle-build.log
+
+      - name: Tom tat loi + dump API (chi chay khi loi)
+        if: failure()
+        working-directory: proj
+        shell: bash
+        run: |
+          {
+            echo '## Loi bien dich (da loc trung)'
+            echo '```'
+            grep -E "error:" gradle-build.log | sed -E 's#.*/realisticvillagers/##' | sort -u | head -400
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          JAR=""
+          for j in $(find ~/.gradle ~/.m2 "$PWD/.gradle" -name '*.jar' 2>/dev/null); do
+            if unzip -l "$j" 2>/dev/null | grep -q 'net/minecraft/world/entity/EntityType.class'; then JAR="$j"; break; fi
+          done
+          {
+            echo '## API 26.2 (javap)'
+            echo "jar: $JAR"
+            if [ -n "$JAR" ]; then
+              echo '### EntityType (villager/trader)'
+              javap -p -cp "$JAR" net.minecraft.world.entity.EntityType | grep -iE "villager|trader" || true
+              echo '### SoundEvents (cat)'
+              javap -p -cp "$JAR" net.minecraft.sounds.SoundEvents | grep -i "cat_" || true
+              echo '### Class Villager / WanderingTrader / Cat'
+              unzip -l "$JAR" | grep -iE "/(Villager|WanderingTrader|Cat|AbstractVillager)\.class" || true
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload plugin jar
         uses: actions/upload-artifact@v4
@@ -141,4 +212,3 @@ jobs:
         with:
           name: build-log
           path: proj/gradle-build.log
-          
