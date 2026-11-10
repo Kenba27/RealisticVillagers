@@ -14,6 +14,10 @@ jobs:
         run: |
           rm -rf proj && mkdir proj
           unzip -q -o RealisticVillagers-26.2-source.zip -d proj
+          # Vá packetevents: bản SNAPSHOT trên jitpack bị 401 -> dùng bản release trên codemc.
+          sed -i 's#<version>2.9.5-SNAPSHOT</version>#<version>2.9.5</version>#' proj/core/pom.xml
+          sed -i '0,/<repositories>/s#<repositories>#<repositories>\n        <repository>\n            <id>codemc-snapshots</id>\n            <url>https://repo.codemc.io/repository/maven-snapshots/</url>\n        </repository>#' proj/core/pom.xml
+          grep -n -B2 -A2 "packetevents\|codemc-snapshots" proj/core/pom.xml
 
       - name: Setup JDK 21
         uses: actions/setup-java@v4
@@ -53,4 +57,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: proj/gradle-build.log
+          path: proj/gradle-build.loga
