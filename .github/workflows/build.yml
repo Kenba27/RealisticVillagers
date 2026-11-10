@@ -14,10 +14,79 @@ jobs:
         run: |
           rm -rf proj && mkdir proj
           unzip -q -o RealisticVillagers-26.2-source.zip -d proj
-          # Vá packetevents: bản SNAPSHOT trên jitpack bị 401 -> dùng bản release trên codemc.
-          sed -i 's#<version>2.9.5-SNAPSHOT</version>#<version>2.9.5</version>#' proj/core/pom.xml
-          sed -i '0,/<repositories>/s#<repositories>#<repositories>\n        <repository>\n            <id>codemc-snapshots</id>\n            <url>https://repo.codemc.io/repository/maven-snapshots/</url>\n        </repository>#' proj/core/pom.xml
-          grep -n -B2 -A2 "packetevents\|codemc-snapshots" proj/core/pom.xml
+
+      - name: Va dependency (ConfigUpdater, EliteMobs, packetevents)
+        run: |
+          cat > patch.py <<'PYEOF'
+          import re, pathlib
+          p = pathlib.Path("proj/core/pom.xml")
+          s = p.read_text()
+
+          # 1) packetevents: dung ban release
+          s = s.replace("<version>2.9.5-SNAPSHOT</version>", "<version>2.9.5</version>")
+
+          # 2) ConfigUpdater: snapshot da mat -> dung ban 2.2 tren Maven Central
+          s = s.replace("<artifactId>ConfigUpdater</artifactId>\n            <version>2.0-SNAPSHOT</version>",
+                        "<artifactId>ConfigUpdater</artifactId>\n            <version>2.2</version>")
+
+          # 3) EliteMobs: bo dependency (snapshot da mat), EMCompatibility se dung reflection
+          s, n = re.subn(r"\s*<!-- EliteMobs -->\s*<dependency>.*?</dependency>", "", s, flags=re.S)
+          assert n == 1, "khong tim thay EliteMobs"
+          p.write_text(s)
+
+          em = pathlib.Path("proj/core/src/main/java/me/matsubara/realisticvillagers/compatibility/EMCompatibility.java")
+          em.write_text('''package me.matsubara.realisticvillagers.compatibility;
+
+          import org.bukkit.Bukkit;
+          import org.bukkit.entity.Villager;
+          import org.bukkit.plugin.Plugin;
+
+          import java.lang.reflect.Method;
+          import java.util.ArrayList;
+          import java.util.List;
+
+          // Dung reflection de khong can EliteMobs luc compile.
+          public class EMCompatibility implements Compatibility {
+
+              private static final String[] NAMES = {"isNPC", "isEliteProjectile", "isEliteEntity", "isSuperMob", "isVisualEffect"};
+
+              private List<Method> methods;
+              private boolean failed;
+
+              @Override
+              public boolean shouldTrack(Villager villager) {
+                  if (failed) return true;
+                  try {
+                      if (methods == null) {
+                          Plugin plugin = Bukkit.getPluginManager().getPlugin("EliteMobs");
+                          if (plugin == null) {
+                              failed = true;
+                              return true;
+                          }
+                          Class<?> clazz = Class.forName("com.magmaguy.elitemobs.tagger.PersistentTagger", true, plugin.getClass().getClassLoader());
+                          List<Method> found = new ArrayList<>();
+                          for (String name : NAMES) {
+                              try {
+                                  found.add(clazz.getMethod(name, org.bukkit.entity.Entity.class));
+                              } catch (NoSuchMethodException ignored) {
+                              }
+                          }
+                          methods = found;
+                      }
+                      for (Method method : methods) {
+                          if ((boolean) method.invoke(null, villager)) return false;
+                      }
+                      return true;
+                  } catch (Throwable throwable) {
+                      failed = true;
+                      return true;
+                  }
+              }
+          }
+          ''')
+          PYEOF
+          python3 patch.py
+          grep -n -A3 "ConfigUpdater\|packetevents-spigot" proj/core/pom.xml
 
       - name: Setup JDK 21
         uses: actions/setup-java@v4
@@ -27,7 +96,7 @@ jobs:
 
       - name: Build core (Maven)
         working-directory: proj
-        run: mvn -B -ntp -pl core -am clean package -DskipTests
+        run: mvn -B -ntp -U -pl core -am clean package -DskipTests
 
       - name: Setup JDK 25
         uses: actions/setup-java@v4
@@ -57,4 +126,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: proj/gradle-build.loga
+          path: proj/gradle-build.log
