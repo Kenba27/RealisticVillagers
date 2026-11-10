@@ -13,7 +13,9 @@ jobs:
       - name: Giai nen source
         run: |
           rm -rf proj && mkdir proj
-          unzip -q -o RealisticVillagers-26.2-source.zip -d proj
+          ZIP=$(ls RealisticVillagers-*source*.zip | head -n1)
+          echo "Dung file: $ZIP"
+          unzip -q -o "$ZIP" -d proj
 
       - name: Va dependency (ConfigUpdater, EliteMobs, packetevents)
         run: |
@@ -178,7 +180,7 @@ jobs:
           {
             echo '## Loi bien dich (da loc trung)'
             echo '```'
-            grep -E "error:" gradle-build.log | sed -E 's#.*/realisticvillagers/##' | sort -u | head -400
+            grep -E -A3 "error:" gradle-build.log 2>/dev/null | sed -E 's#.*/realisticvillagers/##' | head -1500
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
