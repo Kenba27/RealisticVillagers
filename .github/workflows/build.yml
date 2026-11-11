@@ -13,7 +13,7 @@ jobs:
       - name: Giai nen source
         run: |
           rm -rf proj && mkdir proj
-          ZIP=$(ls RealisticVillagers-*source*.zip | head -n1)
+          ZIP=$(ls RealisticVillagers-*source*.zip | sort -V | tail -n1)
           echo "Dung file: $ZIP"
           unzip -q -o "$ZIP" -d proj
 
