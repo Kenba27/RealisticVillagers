@@ -263,6 +263,18 @@ jobs:
               javap -p -cp "$CP" "$c" 2>&1 | head -600
             done
           } >> api-dump.txt 2>&1
+          {
+            echo
+            echo '=== EXTRA: Timeline / Clock / EnvironmentAttributeSystem ==='
+            XL=""
+            for j in ${CP//:/ }; do
+              XL="$XL $(unzip -Z1 "$j" | grep -E '\.class$' | grep -E '(Timeline|WorldClock|ClockManager|ClockTimeMarker|EnvironmentAttributeSystem|KeyframeTrack|/Keyframe)[A-Za-z$]*\.class$' | sed 's#/#.#g; s#\.class$##' | tr '\n' ' ')"
+            done
+            for c in $XL net.minecraft.server.level.ServerLevel net.minecraft.world.level.Level; do
+              echo "=================== $c"
+              javap -p -cp "$CP" "$c" 2>&1 | grep -iE "class |interface |enum |record |clock|timeline|daytime|gametime|builder|addTimelineLayer|addConstantLayer" | head -150
+            done
+          } >> api-dump.txt 2>&1
           wc -l api-dump.txt
           head -c 20000 api-dump.txt >> "$GITHUB_STEP_SUMMARY"
 
